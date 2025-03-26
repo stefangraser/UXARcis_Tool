@@ -8,13 +8,13 @@ Dieses Tool berechnet die Mittelwerte der UXARcis-Daten auf Basis gleich benannt
 """)
 
 
-# Datei-Upload
+Datei-Upload
 uploaded_file = st.file_uploader("Lade deine UXARcis-Daten hoch (CSV oder Excel)", type=["csv", "xlsx"])
 if uploaded_file:
     try:
         # Automatisches Einlesen je nach Dateityp
         if uploaded_file.name.endswith(".csv"):
-            df = pd.read_csv(uploaded_file)
+            df = pd.read_csv(uploaded_file, sep=';')  # Trennzeichen für CSV anpassen
         else:
             xls = pd.ExcelFile(uploaded_file)
             sheet_names = xls.sheet_names
@@ -89,3 +89,4 @@ if uploaded_file:
         st.error(f"Fehler beim Verarbeiten der Datei: {e}")
 else:
     st.info("Bitte lade eine CSV- oder Excel-Datei mit UXARcis-Daten hoch.")
+
