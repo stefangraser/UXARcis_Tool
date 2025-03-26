@@ -28,29 +28,36 @@ if uploaded_file:
         # Umwandlung in numerische Werte
         df = df.apply(pd.to_numeric, errors='coerce')
 
-        # Mapping der Items zu den UXARcis-Dimensionen per Präfix-Matching
-        dimensions = {
-            "Effizienz": df.filter(regex=r'^E\\d+$'),
-            "Verständlichkeit": df.filter(regex=r'^V\\d+$'),
-            "Steuerbarkeit": df.filter(regex=r'^S\\d+$'),
-            "Nützlichkeit": df.filter(regex=r'^N\\d+$'),
-            "Klarheit": df.filter(regex=r'^C\\d+$'),
-            "Gesamtzufriedenheit": df.filter(regex=r'^G\\d*$'),
+        # Definiere feste Item-Zuweisung zu Dimensionen
+        dimensions_items = {
+            "Gesamtzufriedenheit": ['G'],
+            "Effizienz": ['E5', 'E1', 'E3'],
+            "Klarheit": ['C2', 'C1', 'C4'],
+            "Verständlichkeit": ['V4', 'V3', 'V2'],
+            "Steuerbarkeit": ['S3', 'S4', 'S5'],
+            "Nützlichkeit": ['N1', 'N2', 'N4']
         }
 
-        arcis = {
-            "Interaktivität": df.filter(regex=r'^Int\\d+$'),
-            "Räumlichkeit": df.filter(regex=r'^Spa\\d+$'),
-            "Kontextualität": df.filter(regex=r'^Con\\d+$'),
+        arcis_items = {
+            "Räumlichkeit": ['Spa5', 'Spa2', 'Spa4', 'Spa1', 'Spa6', 'Spa3'],
+            "Interaktivität": ['Int4', 'Int2', 'Int6', 'Int3', 'Int1', 'Int5'],
+            "Kontextualität": ['Con4', 'Con2', 'Con1', 'Con6', 'Con5', 'Con3']
         }
 
-        # Mittelwerte berechnen
-        dimension_means = {k: v.astype(float).stack().mean() for k, v in dimensions.items() if not v.empty}
-        arcis_means = {k: v.astype(float).stack().mean() for k, v in arcis.items() if not v.empty}
+        # Mittelwerte je Dimension berechnen
+        dimension_means = {}
+        for name, items in dimensions_items.items():
+            selected = df[items].astype(float)
+            dimension_means[name] = selected.stack().mean()
+
+        arcis_means = {}
+        for name, items in arcis_items.items():
+            selected = df[items].astype(float)
+            arcis_means[name] = selected.stack().mean()
 
         # Gesamtscores berechnen
-        gesamt_ux = pd.concat([v for v in dimensions.values() if not v.empty], axis=1).astype(float).stack().mean()
-        gesamt_arcis = pd.concat([v for v in arcis.values() if not v.empty], axis=1).astype(float).stack().mean()
+        gesamt_ux = pd.concat([df[items] for items in dimensions_items.values()], axis=1).astype(float).stack().mean()
+        gesamt_arcis = pd.concat([df[items] for items in arcis_items.values()], axis=1).astype(float).stack().mean()
 
         # Anzeige
         st.subheader("Mittelwerte je UX-Dimension")
