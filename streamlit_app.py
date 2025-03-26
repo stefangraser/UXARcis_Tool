@@ -7,6 +7,7 @@ st.markdown("""
 Dieses Tool berechnet die Mittelwerte der UXARcis-Daten auf Basis gleich benannter Spaltenüberschriften.
 """)
 
+
 # Datei-Upload
 uploaded_file = st.file_uploader("Lade deine UXARcis-Daten hoch (CSV oder Excel)", type=["csv", "xlsx"])
 if uploaded_file:
@@ -27,14 +28,14 @@ if uploaded_file:
         # Umwandlung in numerische Werte
         df = df.apply(pd.to_numeric, errors='coerce')
 
-        # Mapping der Items zu den UXARcis-Dimensionen
+        # Mapping der Items zu den UXARcis-Dimensionen per Präfix-Matching
         dimensions = {
             "Effizienz": df.filter(regex=r'^E\\d+$'),
             "Verständlichkeit": df.filter(regex=r'^V\\d+$'),
             "Steuerbarkeit": df.filter(regex=r'^S\\d+$'),
             "Nützlichkeit": df.filter(regex=r'^N\\d+$'),
             "Klarheit": df.filter(regex=r'^C\\d+$'),
-            "Gesamtzufriedenheit": df.filter(regex=r'^G$'),
+            "Gesamtzufriedenheit": df.filter(regex=r'^G\\d*$'),
         }
 
         arcis = {
@@ -44,12 +45,12 @@ if uploaded_file:
         }
 
         # Mittelwerte berechnen
-        dimension_means = {k: v.stack().mean() for k, v in dimensions.items()}
-        arcis_means = {k: v.stack().mean() for k, v in arcis.items()}
+        dimension_means = {k: v.astype(float).stack().mean() for k, v in dimensions.items() if not v.empty}
+        arcis_means = {k: v.astype(float).stack().mean() for k, v in arcis.items() if not v.empty}
 
         # Gesamtscores berechnen
-        gesamt_ux = pd.concat(dimensions.values(), axis=1).stack().mean()
-        gesamt_arcis = pd.concat(arcis.values(), axis=1).stack().mean()
+        gesamt_ux = pd.concat([v for v in dimensions.values() if not v.empty], axis=1).astype(float).stack().mean()
+        gesamt_arcis = pd.concat([v for v in arcis.values() if not v.empty], axis=1).astype(float).stack().mean()
 
         # Anzeige
         st.subheader("Mittelwerte je UX-Dimension")
