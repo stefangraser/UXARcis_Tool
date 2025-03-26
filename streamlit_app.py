@@ -49,4 +49,3 @@ if uploaded_file:
         st.error(f"Fehler beim Verarbeiten der Datei: {e}")
 else:
     st.info("Bitte lade eine CSV-Datei mit UXARcis-Daten hoch.")
-
