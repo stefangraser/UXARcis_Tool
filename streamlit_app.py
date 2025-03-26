@@ -8,7 +8,7 @@ Dieses Tool berechnet die Mittelwerte der UXARcis-Daten auf Basis gleich benannt
 """)
 
 
-Datei-Upload
+#Datei-Upload
 uploaded_file = st.file_uploader("Lade deine UXARcis-Daten hoch (CSV oder Excel)", type=["csv", "xlsx"])
 if uploaded_file:
     try:
