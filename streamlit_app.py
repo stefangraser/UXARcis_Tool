@@ -87,6 +87,11 @@ if uploaded_file:
         st.markdown(f"**Gesamt UX Score:** {gesamt_ux:.2f}")
         st.markdown(f"**ARcis Score:** {gesamt_arcis:.2f}")
 
+# Anzeige
+        st.subheader("Mittelwerte je UX-Dimension")
+        ux_df = pd.DataFrame.from_dict(dimension_means, orient='index', columns=['Mittelwert'])
+        st.table(ux_df)
+
         
  # Visualisierung UX-Dimensionen
         fig1, ax1 = plt.subplots()
