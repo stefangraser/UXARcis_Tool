@@ -88,28 +88,6 @@ if uploaded_file:
         st.markdown(f"**ARcis Score:** {gesamt_arcis:.2f}")
 
 
-        # Visualisierung UX-Dimensionen
-        fig1, ax1 = plt.subplots()
-        ux_df.plot(kind='barh', legend=False, ax=ax1, color='skyblue')
-        ax1.set_xlabel("Mittelwert")
-        ax1.set_title("UX-Dimensionen")
-        st.pyplot(fig1)
-
-        st.subheader("Mittelwerte je ARcis-Kriterium")
-        arcis_df = pd.DataFrame.from_dict(arcis_means, orient='index', columns=['Mittelwert'])
-        st.table(arcis_df)
-
-        # Visualisierung ARcis-Kriterien
-        fig2, ax2 = plt.subplots()
-        arcis_df.plot(kind='barh', legend=False, ax=ax2, color='lightgreen')
-        ax2.set_xlabel("Mittelwert")
-        ax2.set_title("ARcis-Kriterien")
-        st.pyplot(fig2)
-
-        st.subheader("Gesamt-Scores")
-        st.markdown(f"**Gesamt UX Score:** {gesamt_ux:.2f}")
-        st.markdown(f"**ARcis Score:** {gesamt_arcis:.2f}")
-
     except Exception as e:
         st.error(f"Fehler beim Verarbeiten der Datei: {e}")
 else:
