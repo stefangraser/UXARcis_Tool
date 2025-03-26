@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 
 # Titel
-st.title("UXARcis Mittelwert-Analyse Tool")
+st.title("UXARcis Evaluationstool")
 st.markdown("""
 Dieses Tool berechnet die Mittelwerte der UXARcis-Daten auf Basis gleich benannter Spaltenüberschriften.
 """)
