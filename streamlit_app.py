@@ -53,7 +53,8 @@ if uploaded_file:
                 st.warning(f"Keine gültigen Spalten für {name} gefunden.")
                 continue
             selected = df[available_items].astype(float)
-            dimension_means[name] = selected.stack().mean()
+            mean_value = selected.stack().mean()
+            dimension_means[name] = round(mean_value, 2)
 
         # Mittelwerte je ARcis-Kriterium
         arcis_means = {}
@@ -63,7 +64,8 @@ if uploaded_file:
                 st.warning(f"Keine gültigen Spalten für {name} gefunden.")
                 continue
             selected = df[available_items].astype(float)
-            arcis_means[name] = selected.stack().mean()
+            mean_value = selected.stack().mean()
+            arcis_means[name] = round(mean_value, 2)
 
         # Gesamtscores berechnen
         all_ux_items = [item for sublist in dimensions_items.values() for item in sublist if item in df.columns]
@@ -74,10 +76,10 @@ if uploaded_file:
 
         # Anzeige
         st.subheader("Mittelwerte je UX-Dimension")
-        st.dataframe(pd.DataFrame.from_dict(dimension_means, orient='index', columns=['Mittelwert']).round(2))
+        st.table(pd.DataFrame.from_dict(dimension_means, orient='index', columns=['Mittelwert']))
 
         st.subheader("Mittelwerte je ARcis-Kriterium")
-        st.dataframe(pd.DataFrame.from_dict(arcis_means, orient='index', columns=['Mittelwert']).round(2))
+        st.table(pd.DataFrame.from_dict(arcis_means, orient='index', columns=['Mittelwert']))
 
         st.subheader("Gesamt-Scores")
         st.markdown(f"**Gesamt UX Score:** {gesamt_ux:.2f}")
