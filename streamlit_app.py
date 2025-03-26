@@ -25,7 +25,8 @@ if uploaded_file:
 
         st.success("Datei erfolgreich geladen!")
 
-        # Umwandlung in numerische Werte
+        # Bereinige Spaltennamen (z. B. entferne Leerzeichen)
+        df.columns = df.columns.astype(str).str.strip()
         df = df.apply(pd.to_numeric, errors='coerce')
 
         # Definiere feste Item-Zuweisung zu Dimensionen
@@ -44,20 +45,32 @@ if uploaded_file:
             "Kontextualität": ['Con4', 'Con2', 'Con1', 'Con6', 'Con5', 'Con3']
         }
 
-        # Mittelwerte je Dimension berechnen
+        # Mittelwerte je UX-Dimension
         dimension_means = {}
         for name, items in dimensions_items.items():
-            selected = df[items].astype(float)
+            available_items = [item for item in items if item in df.columns]
+            if not available_items:
+                st.warning(f"Keine gültigen Spalten für {name} gefunden.")
+                continue
+            selected = df[available_items].astype(float)
             dimension_means[name] = selected.stack().mean()
 
+        # Mittelwerte je ARcis-Kriterium
         arcis_means = {}
         for name, items in arcis_items.items():
-            selected = df[items].astype(float)
+            available_items = [item for item in items if item in df.columns]
+            if not available_items:
+                st.warning(f"Keine gültigen Spalten für {name} gefunden.")
+                continue
+            selected = df[available_items].astype(float)
             arcis_means[name] = selected.stack().mean()
 
         # Gesamtscores berechnen
-        gesamt_ux = pd.concat([df[items] for items in dimensions_items.values()], axis=1).astype(float).stack().mean()
-        gesamt_arcis = pd.concat([df[items] for items in arcis_items.values()], axis=1).astype(float).stack().mean()
+        all_ux_items = [item for sublist in dimensions_items.values() for item in sublist if item in df.columns]
+        all_arcis_items = [item for sublist in arcis_items.values() for item in sublist if item in df.columns]
+
+        gesamt_ux = df[all_ux_items].astype(float).stack().mean() if all_ux_items else float('nan')
+        gesamt_arcis = df[all_arcis_items].astype(float).stack().mean() if all_arcis_items else float('nan')
 
         # Anzeige
         st.subheader("Mittelwerte je UX-Dimension")
