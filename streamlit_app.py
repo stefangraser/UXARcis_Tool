@@ -24,21 +24,43 @@ if uploaded_file:
 
         st.success("Datei erfolgreich geladen!")
 
-        # Gruppierte Mittelwerte berechnen
-        grouped_means = {}
-        for col_name in df.columns.unique():
-            if pd.isna(col_name):
-                continue
-            matching_cols = df.loc[:, df.columns == col_name]
-            matching_cols = matching_cols.apply(pd.to_numeric, errors='coerce')
-            mean_value = matching_cols.stack().mean()
-            grouped_means[col_name] = mean_value
+        # Umwandlung in numerische Werte
+        df = df.apply(pd.to_numeric, errors='coerce')
 
-        mean_df = pd.DataFrame.from_dict(grouped_means, orient='index', columns=['Mittelwert'])
-        mean_df = mean_df.sort_values(by='Mittelwert', ascending=False)
+        # Mapping der Items zu den UXARcis-Dimensionen
+        dimensions = {
+            "Effizienz": df.filter(regex=r'^E\\d+$'),
+            "Verständlichkeit": df.filter(regex=r'^V\\d+$'),
+            "Steuerbarkeit": df.filter(regex=r'^S\\d+$'),
+            "Nützlichkeit": df.filter(regex=r'^N\\d+$'),
+            "Klarheit": df.filter(regex=r'^C\\d+$'),
+            "Gesamtzufriedenheit": df.filter(regex=r'^G$'),
+        }
 
-        st.subheader("Mittelwerte je Konstrukt")
-        st.dataframe(mean_df.round(2))
+        arcis = {
+            "Interaktivität": df.filter(regex=r'^Int\\d+$'),
+            "Räumlichkeit": df.filter(regex=r'^Spa\\d+$'),
+            "Kontextualität": df.filter(regex=r'^Con\\d+$'),
+        }
+
+        # Mittelwerte berechnen
+        dimension_means = {k: v.stack().mean() for k, v in dimensions.items()}
+        arcis_means = {k: v.stack().mean() for k, v in arcis.items()}
+
+        # Gesamtscores berechnen
+        gesamt_ux = pd.concat(dimensions.values(), axis=1).stack().mean()
+        gesamt_arcis = pd.concat(arcis.values(), axis=1).stack().mean()
+
+        # Anzeige
+        st.subheader("Mittelwerte je UX-Dimension")
+        st.dataframe(pd.DataFrame.from_dict(dimension_means, orient='index', columns=['Mittelwert']).round(2))
+
+        st.subheader("Mittelwerte je ARcis-Kriterium")
+        st.dataframe(pd.DataFrame.from_dict(arcis_means, orient='index', columns=['Mittelwert']).round(2))
+
+        st.subheader("Gesamt-Scores")
+        st.markdown(f"**Gesamt UX Score:** {gesamt_ux:.2f}")
+        st.markdown(f"**ARcis Score:** {gesamt_arcis:.2f}")
 
     except Exception as e:
         st.error(f"Fehler beim Verarbeiten der Datei: {e}")
