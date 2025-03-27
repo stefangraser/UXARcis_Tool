@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 
-
 # Titel
 st.title("UXARcis Evaluationstool")
 st.markdown("""
