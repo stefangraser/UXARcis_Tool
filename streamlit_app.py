@@ -2,9 +2,9 @@ import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 
-#Link: 
+#Link: https://uxarcis.streamlit.app/
 # Titel
-st.title("UXARcis Evaluationstool")
+st.title("UXARcis Evaluationstool - Version 07.04.2025")
 st.markdown("""
 Dieses Tool berechnet die Mittelwerte der UXARcis-Daten auf Basis gleich benannter Spaltenüberschriften.
 """)
