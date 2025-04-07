@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 
 #Link: https://uxarcis.streamlit.app/
 # Titel
-st.title("UXARcis Evaluationstool - Version 07.04.2025")
+st.title("UXARcis Evaluationstool")
 st.markdown("""
 Dieses Tool berechnet die Mittelwerte der UXARcis-Daten auf Basis gleich benannter Spaltenüberschriften.
 """)
