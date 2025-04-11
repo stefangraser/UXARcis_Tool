@@ -8,10 +8,21 @@ st.set_page_config(page_title="UXARcis Tool", layout="wide")
 st.title("UXARcis-Evaluationstool")
 st.markdown("Effektive UX-Analyse für AR-Autoren.")
 
+# Verbindungstest beim Start
+try:
+    conn_test = st.connection("postgresql", type="sql")
+    test_engine = conn_test._instance.engine
+    with test_engine.connect() as test_conn:
+        test_conn.execute(text("SELECT 1"))
+    st.success("✅ Verbindung zur Datenbank erfolgreich.")
+except Exception as e:
+    st.error("❌ Verbindung zur Datenbank fehlgeschlagen.")
+    st.exception(e)
+
 uploaded_file = st.file_uploader("Lade deine UXARcis-Daten hoch (CSV oder Excel)", type=["csv", "xlsx"])
 
 if uploaded_file:
-    # Verbindungsaufbau erst nach Datei-Upload
+    # Verbindungsaufbau nach Datei-Upload
     conn = st.connection("postgresql", type="sql")
     engine = conn._instance.engine
     cursor = engine.connect()
@@ -156,8 +167,6 @@ if uploaded_file:
 
     except Exception as e:
         st.error(f"Fehler beim Verarbeiten der Datei: {e}")
+        st.exception(e)
 else:
     st.info("Bitte lade eine CSV- oder Excel-Datei mit UXARcis-Daten hoch.")
-    
-
-st.exception(e)
