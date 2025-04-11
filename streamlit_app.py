@@ -19,7 +19,7 @@ try:
     neon_engine = create_engine(url, pool_pre_ping=True)
     with neon_engine.begin() as conn_test:
         conn_test.execute(text("SELECT 1"))
-    st.success("✅ Verbindung zur Neon-Datenbank erfolgreich.")
+    st.success("✅ Verbindung zur Neon-Datenbank für Benchmarkanalyse erfolgreich.")
 except Exception as e:
     st.warning("⚠️ Neon-Verbindung nicht aktiv. Es wird lokal mit SQLite gearbeitet.")
 
