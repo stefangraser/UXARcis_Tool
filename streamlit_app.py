@@ -3,6 +3,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import sqlite3
 from datetime import datetime
+import uuid
 
 # Verbindung zur SQLite-Datenbank herstellen (bzw. erstellen, falls nicht vorhanden)
 conn = sqlite3.connect("evaluation_data.db", check_same_thread=False)
@@ -11,7 +12,7 @@ cursor = conn.cursor()
 # Tabelle erstellen, falls sie noch nicht existiert
 cursor.execute("""
 CREATE TABLE IF NOT EXISTS evaluations (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id TEXT,
     filename TEXT,
     upload_date TEXT,
     item TEXT,
@@ -21,7 +22,7 @@ CREATE TABLE IF NOT EXISTS evaluations (
 conn.commit()
 
 # Titel
-st.title("UXARcis-Evaluationstool")
+st.title("UXARcis Evaluationstool")
 st.markdown("""
 Effektive UX-Analyse für AR-Autoren.
 """)
@@ -47,17 +48,18 @@ if uploaded_file:
         df.columns = df.columns.astype(str).str.strip()
         df = df.apply(pd.to_numeric, errors='coerce')
 
-        # SQLite: Speichere alle Werte aus der Datei
+        # SQLite: Speichere alle Werte aus der Datei mit gemeinsamer Upload-ID
         upload_time = datetime.now().isoformat()
         file_name = uploaded_file.name
+        upload_id = str(uuid.uuid4())  # Einzigartige ID pro Upload
 
         for col in df.columns:
             for val in df[col].dropna():
                 try:
                     float_val = float(val)
                     cursor.execute(
-                        "INSERT INTO evaluations (filename, upload_date, item, value) VALUES (?, ?, ?, ?)",
-                        (file_name, upload_time, col, float_val)
+                        "INSERT INTO evaluations (id, filename, upload_date, item, value) VALUES (?, ?, ?, ?, ?)",
+                        (upload_id, file_name, upload_time, col, float_val)
                     )
                 except:
                     continue
