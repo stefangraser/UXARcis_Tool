@@ -3,6 +3,24 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import sqlite3
 from datetime import datetime
+import urllib.parse
+from sqlalchemy import create_engine, text
+
+# Optional: Neon-Verbindung testen (falls gewünscht)
+try:
+    username = st.secrets["connections"]["neon"]["username"]
+    password = st.secrets["connections"]["neon"]["password"]
+    host = st.secrets["connections"]["neon"]["host"]
+    database = st.secrets["connections"]["neon"]["database"]
+    sslmode = st.secrets["connections"]["neon"].get("sslmode", "require")
+
+    url = f"postgresql+psycopg2://{username}:{urllib.parse.quote_plus(password)}@{host}/{database}?sslmode={sslmode}"
+    engine = create_engine(url, pool_pre_ping=True)
+    with engine.begin() as conn_test:
+        conn_test.execute(text("SELECT 1"))
+    st.success("✅ Verbindung zur Neon-Datenbank erfolgreich.")
+except Exception as e:
+    st.warning("⚠️ Neon-Verbindung nicht aktiv. Es wird lokal mit SQLite gearbeitet.")
 
 # Verbindung zur SQLite-Datenbank herstellen (bzw. erstellen, falls nicht vorhanden)
 conn = sqlite3.connect("evaluation_data.db", check_same_thread=False)
