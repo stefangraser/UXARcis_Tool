@@ -95,7 +95,7 @@ if uploaded_file:
         # Mittelwerte berechnen
         dimension_means = {}
         for name, items in dimensions_items.items():
-            available_items = [item for item in items if item in df.index]
+            available_items = [item for item in items if item in df_transposed.index]
             if not available_items:
                 st.warning(f"Keine gültigen Spalten für {name} gefunden.")
                 continue
@@ -105,7 +105,7 @@ if uploaded_file:
 
         arcis_means = {}
         for name, items in arcis_items.items():
-            available_items = [item for item in items if item in df.index]
+            available_items = [item for item in items if item in df_transposed.index]
             if not available_items:
                 st.warning(f"Keine gültigen Spalten für {name} gefunden.")
                 continue
@@ -113,8 +113,8 @@ if uploaded_file:
             mean_value = selected.stack().mean()
             arcis_means[name] = round(mean_value, 2)
 
-        all_ux_items = [item for sublist in dimensions_items.values() for item in sublist if item in df.index]
-        all_arcis_items = [item for sublist in arcis_items.values() for item in sublist if item in df.index]
+        all_ux_items = [item for sublist in dimensions_items.values() for item in sublist if item in df_transposed.index]
+        all_arcis_items = [item for sublist in arcis_items.values() for item in sublist if item in df_transposed.index]
 
         gesamt_ux = df_transposed.loc[all_ux_items].astype(float).stack().mean() if all_ux_items else float('nan')
         gesamt_arcis = df_transposed.loc[all_arcis_items].astype(float).stack().mean() if all_arcis_items else float('nan')
@@ -147,7 +147,7 @@ if uploaded_file:
         st.markdown(f"**ARcis Score:** {gesamt_arcis:.2f}")
 
         # Datenbankübersicht anzeigen
-        st.subheader("Datenspeicherung")
+        st.subheader("Alle gespeicherten Einzelwerte")
         df_saved = pd.read_sql_query("SELECT * FROM evaluations ORDER BY upload_date DESC", conn)
         st.dataframe(df_saved)
 
