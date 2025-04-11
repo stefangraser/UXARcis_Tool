@@ -3,7 +3,6 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import sqlite3
 from datetime import datetime
-import uuid
 
 # Verbindung zur SQLite-Datenbank herstellen (bzw. erstellen, falls nicht vorhanden)
 conn = sqlite3.connect("evaluation_data.db", check_same_thread=False)
@@ -16,13 +15,14 @@ CREATE TABLE IF NOT EXISTS evaluations (
     filename TEXT,
     upload_date TEXT,
     item TEXT,
+    participant TEXT,
     value REAL
 )
 """)
 conn.commit()
 
 # Titel
-st.title("UXARcis-Evaluationstool")
+st.title("UXARcis Evaluationstool")
 st.markdown("""
 Effektive UX-Analyse für AR-Autoren.
 """)
@@ -48,21 +48,32 @@ if uploaded_file:
         df.columns = df.columns.astype(str).str.strip()
         df = df.apply(pd.to_numeric, errors='coerce')
 
-        # SQLite: Speichere alle Werte aus der Datei mit gemeinsamer Upload-ID
-        upload_time = datetime.now().isoformat()
-        file_name = uploaded_file.name
-        upload_id = str(uuid.uuid4())  # Einzigartige ID pro Upload
+        # ID = fortlaufende Nummer + Datum
+        now = datetime.now()
+        upload_date = now.strftime("%Y-%m-%dT%H:%M:%S")
+        date_prefix = now.strftime("%Y%m%d")
 
-        for col in df.columns:
-            for val in df[col].dropna():
-                try:
-                    float_val = float(val)
-                    cursor.execute(
-                        "INSERT INTO evaluations (id, filename, upload_date, item, value) VALUES (?, ?, ?, ?, ?)",
-                        (upload_id, file_name, upload_time, col, float_val)
-                    )
-                except:
-                    continue
+        cursor.execute("SELECT COUNT(DISTINCT id) FROM evaluations")
+        result = cursor.fetchone()
+        upload_index = (result[0] or 0) + 1
+        upload_id = f"{upload_index}_{date_prefix}"
+
+        file_name = uploaded_file.name
+
+        # Transponieren: jede Spalte = 1 Teilnehmer
+        df_transposed = df.transpose()
+        df_transposed.columns = [f"Teilnehmer_{i+1}" for i in range(df_transposed.shape[1])]
+
+        for item, values in df_transposed.iterrows():
+            for participant, val in values.items():
+                if pd.notna(val):
+                    try:
+                        cursor.execute(
+                            "INSERT INTO evaluations (id, filename, upload_date, item, participant, value) VALUES (?, ?, ?, ?, ?, ?)",
+                            (upload_id, file_name, upload_date, item, participant, float(val))
+                        )
+                    except:
+                        continue
         conn.commit()
 
         # Definiere Item-Zuweisungen
@@ -84,29 +95,29 @@ if uploaded_file:
         # Mittelwerte berechnen
         dimension_means = {}
         for name, items in dimensions_items.items():
-            available_items = [item for item in items if item in df.columns]
+            available_items = [item for item in items if item in df.index]
             if not available_items:
                 st.warning(f"Keine gültigen Spalten für {name} gefunden.")
                 continue
-            selected = df[available_items].astype(float)
+            selected = df_transposed.loc[available_items].astype(float)
             mean_value = selected.stack().mean()
             dimension_means[name] = round(mean_value, 2)
 
         arcis_means = {}
         for name, items in arcis_items.items():
-            available_items = [item for item in items if item in df.columns]
+            available_items = [item for item in items if item in df.index]
             if not available_items:
                 st.warning(f"Keine gültigen Spalten für {name} gefunden.")
                 continue
-            selected = df[available_items].astype(float)
+            selected = df_transposed.loc[available_items].astype(float)
             mean_value = selected.stack().mean()
             arcis_means[name] = round(mean_value, 2)
 
-        all_ux_items = [item for sublist in dimensions_items.values() for item in sublist if item in df.columns]
-        all_arcis_items = [item for sublist in arcis_items.values() for item in sublist if item in df.columns]
+        all_ux_items = [item for sublist in dimensions_items.values() for item in sublist if item in df.index]
+        all_arcis_items = [item for sublist in arcis_items.values() for item in sublist if item in df.index]
 
-        gesamt_ux = df[all_ux_items].astype(float).stack().mean() if all_ux_items else float('nan')
-        gesamt_arcis = df[all_arcis_items].astype(float).stack().mean() if all_arcis_items else float('nan')
+        gesamt_ux = df_transposed.loc[all_ux_items].astype(float).stack().mean() if all_ux_items else float('nan')
+        gesamt_arcis = df_transposed.loc[all_arcis_items].astype(float).stack().mean() if all_arcis_items else float('nan')
 
         # Anzeige UX-Dimensionen
         st.subheader("Mittelwerte je UX-Dimension")
@@ -136,7 +147,7 @@ if uploaded_file:
         st.markdown(f"**ARcis Score:** {gesamt_arcis:.2f}")
 
         # Datenbankübersicht anzeigen
-        st.subheader("Alle gespeicherten Einzelwerte")
+        st.subheader("Datenspeicherung")
         df_saved = pd.read_sql_query("SELECT * FROM evaluations ORDER BY upload_date DESC", conn)
         st.dataframe(df_saved)
 
