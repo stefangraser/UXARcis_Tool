@@ -19,7 +19,7 @@ try:
     neon_engine = create_engine(url, pool_pre_ping=True)
     with neon_engine.begin() as conn_test:
         conn_test.execute(text("SELECT 1"))
-    st.success("✅ Verbindung zur Neon-Datenbank für Benchmarkanalyse erfolgreich.")
+    st.success("✅ Verbindung zur Neon-Datenbank für das Benchmarking erfolgreich.")
 except Exception as e:
     st.warning("⚠️ Neon-Verbindung nicht aktiv. Es wird lokal mit SQLite gearbeitet.")
 
@@ -40,27 +40,27 @@ CREATE TABLE IF NOT EXISTS evaluations (
 """)
 conn.commit()
 
-
-
-
-
-
-
-
-
-
-
 # Titel
-st.title("UXARcis Evaluationstool")
+st.title("UXARcis-Evaluationstool")
 st.markdown("""
 Effektive UX-Analyse für AR-Autoren.
 """)
+
+# Optional: Daten aus Neon anzeigen
+if neon_engine and st.button("📥 Zeige gespeicherte Neon-Daten"):
+    try:
+        with neon_engine.begin() as neon_conn:
+            neon_df = pd.read_sql_query("SELECT * FROM evaluations ORDER BY upload_date DESC LIMIT 100", neon_conn)
+            st.subheader("Daten aus Neon-Datenbank")
+            st.dataframe(neon_df)
+    except Exception as e:
+        st.error("Fehler beim Abrufen der Daten aus Neon:")
+        st.exception(e)
 
 # Datei-Upload
 uploaded_file = st.file_uploader("Lade deine UXARcis-Daten hoch (CSV oder Excel)", type=["csv", "xlsx"])
 if uploaded_file:
     try:
-        # Automatisches Einlesen je nach Dateityp
         if uploaded_file.name.endswith(".csv"):
             df = pd.read_csv(uploaded_file, sep=';')
         else:
@@ -87,6 +87,20 @@ if uploaded_file:
         upload_id = f"{upload_index}_{date_prefix}"
         file_name = uploaded_file.name
 
+        # Optional: auch Neon-Tabelle vorbereiten
+        if neon_engine:
+            with neon_engine.begin() as neon_conn:
+                neon_conn.execute(text("""
+                    CREATE TABLE IF NOT EXISTS evaluations (
+                        id TEXT,
+                        filename TEXT,
+                        upload_date TEXT,
+                        item TEXT,
+                        participant_id TEXT,
+                        value REAL
+                    )
+                """))
+
         for i, row in df.iterrows():
             participant_id = f"Teilnehmer_{i+1}"
             for item, value in row.items():
@@ -96,6 +110,19 @@ if uploaded_file:
                             "INSERT INTO evaluations (id, filename, upload_date, item, participant_id, value) VALUES (?, ?, ?, ?, ?, ?)",
                             (upload_id, file_name, upload_date, item, participant_id, float(value))
                         )
+                        if neon_engine:
+                            with neon_engine.begin() as neon_conn:
+                                neon_conn.execute(text("""
+                                    INSERT INTO evaluations (id, filename, upload_date, item, participant_id, value)
+                                    VALUES (:id, :filename, :upload_date, :item, :participant_id, :value)
+                                """), {
+                                    "id": upload_id,
+                                    "filename": file_name,
+                                    "upload_date": upload_date,
+                                    "item": item,
+                                    "participant_id": participant_id,
+                                    "value": float(value)
+                                })
                     except:
                         continue
         conn.commit()
