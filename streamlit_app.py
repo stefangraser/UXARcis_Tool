@@ -2,15 +2,14 @@ import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 import sqlite3
+import json
 from datetime import datetime
-
-#https://uxarcis.streamlit.app/
 
 # Verbindung zur SQLite-Datenbank herstellen (bzw. erstellen, falls nicht vorhanden)
 conn = sqlite3.connect("evaluation_data.db", check_same_thread=False)
 cursor = conn.cursor()
 
-# Tabelle erstellen, falls sie noch nicht existiert
+# Tabelle für Einzelwerte (besteht bereits)
 cursor.execute("""
 CREATE TABLE IF NOT EXISTS evaluations (
     id TEXT,
@@ -21,10 +20,21 @@ CREATE TABLE IF NOT EXISTS evaluations (
     value REAL
 )
 """)
+
+# Neue Tabelle für 1:1 Upload-Daten
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS raw_uploads (
+    id TEXT,
+    filename TEXT,
+    upload_date TEXT,
+    row_index INTEGER,
+    row_data TEXT
+)
+""")
 conn.commit()
 
 # Titel
-st.title("UXARcis-Evaluationstool")
+st.title("UXARcis Evaluationstool")
 st.markdown("""
 Effektive UX-Analyse für AR-Autoren.
 """)
@@ -35,23 +45,23 @@ if uploaded_file:
     try:
         # Automatisches Einlesen je nach Dateityp
         if uploaded_file.name.endswith(".csv"):
-            df = pd.read_csv(uploaded_file, sep=';')
+            df_preview = pd.read_csv(uploaded_file, sep=';', header=None, nrows=5)
+            has_header = df_preview.iloc[0].str.contains("G|E1|Spa1|Con1", regex=True).any()
+            df = pd.read_csv(uploaded_file, sep=';', header=0 if has_header else None)
         else:
             xls = pd.ExcelFile(uploaded_file)
-            sheet_names = xls.sheet_names
-            df_raw = xls.parse(sheet_names[0])
-            df = df_raw.dropna(how="all")
-            df.columns = df.iloc[0]  # Setze erste beschriftete Zeile als Header
-            df = df[1:]  # Entferne die Headerzeile selbst aus den Daten
+            df_raw = xls.parse(xls.sheet_names[0])
+            df_raw = df_raw.dropna(how="all")
+            df = df_raw.copy()
+            df.columns = df.iloc[0]
+            df = df[1:]
 
         st.success("Datei erfolgreich geladen!")
 
-        # Bereinige Spaltennamen
         df.columns = df.columns.astype(str).str.strip()
         df = df.apply(pd.to_numeric, errors='coerce')
         df = df.reset_index(drop=True)
 
-        # ID = fortlaufende Nummer + Datum
         now = datetime.now()
         upload_date = now.strftime("%Y-%m-%dT%H:%M:%S")
         date_prefix = now.strftime("%Y%m%d")
@@ -60,10 +70,17 @@ if uploaded_file:
         result = cursor.fetchone()
         upload_index = (result[0] or 0) + 1
         upload_id = f"{upload_index}_{date_prefix}"
-
         file_name = uploaded_file.name
 
-        # SQLite-Einträge: Zeilen = Teilnehmer, Spalten = Items
+        # SPEICHERN 1:1 - Ganze Zeile (JSON)
+        for i, row in df.iterrows():
+            row_json = json.dumps(row.dropna().to_dict())
+            cursor.execute(
+                "INSERT INTO raw_uploads (id, filename, upload_date, row_index, row_data) VALUES (?, ?, ?, ?, ?)",
+                (upload_id, file_name, upload_date, i, row_json)
+            )
+
+        # SPEICHERN als Einzelwerte für Auswertung
         for i, row in df.iterrows():
             participant_id = f"Teilnehmer_{i+1}"
             for item, value in row.items():
@@ -77,7 +94,6 @@ if uploaded_file:
                         continue
         conn.commit()
 
-        # Item-Gruppen für Auswertung definieren
         dimensions_items = {
             "Gesamtzufriedenheit": ['G'],
             "Effizienz": ['E5', 'E1', 'E3'],
@@ -120,7 +136,6 @@ if uploaded_file:
         gesamt_ux = df[all_ux_items].astype(float).stack().mean() if all_ux_items else float('nan')
         gesamt_arcis = df[all_arcis_items].astype(float).stack().mean() if all_arcis_items else float('nan')
 
-        # Anzeige UX-Dimensionen
         st.subheader("Mittelwerte je UX-Dimension")
         ux_df = pd.DataFrame.from_dict(dimension_means, orient='index', columns=['Mittelwert'])
         st.table(ux_df)
@@ -131,7 +146,6 @@ if uploaded_file:
         ax1.set_title("UX-Dimensionen")
         st.pyplot(fig1)
 
-        # Anzeige ARcis-Kriterien
         st.subheader("Mittelwerte je ARcis-Kriterium")
         arcis_df = pd.DataFrame.from_dict(arcis_means, orient='index', columns=['Mittelwert'])
         st.table(arcis_df)
@@ -142,12 +156,10 @@ if uploaded_file:
         ax2.set_title("ARcis-Kriterien")
         st.pyplot(fig2)
 
-        # Gesamtscores
         st.subheader("Gesamt-Scores")
         st.markdown(f"**Gesamt UX Score:** {gesamt_ux:.2f}")
         st.markdown(f"**ARcis Score:** {gesamt_arcis:.2f}")
 
-        # Datenbankübersicht anzeigen
         st.subheader("Alle gespeicherten Einzelwerte")
         df_saved = pd.read_sql_query("SELECT * FROM evaluations ORDER BY upload_date DESC", conn)
         st.dataframe(df_saved)
