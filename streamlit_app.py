@@ -7,6 +7,7 @@ import urllib.parse
 from sqlalchemy import create_engine, text
 
 # Optional: Neon-Verbindung testen (falls gewünscht)
+neon_engine = None
 try:
     username = st.secrets["connections"]["neon"]["username"]
     password = st.secrets["connections"]["neon"]["password"]
@@ -15,8 +16,8 @@ try:
     sslmode = st.secrets["connections"]["neon"].get("sslmode", "require")
 
     url = f"postgresql+psycopg2://{username}:{urllib.parse.quote_plus(password)}@{host}/{database}?sslmode={sslmode}"
-    engine = create_engine(url, pool_pre_ping=True)
-    with engine.begin() as conn_test:
+    neon_engine = create_engine(url, pool_pre_ping=True)
+    with neon_engine.begin() as conn_test:
         conn_test.execute(text("SELECT 1"))
     st.success("✅ Verbindung zur Neon-Datenbank erfolgreich.")
 except Exception as e:
@@ -26,7 +27,7 @@ except Exception as e:
 conn = sqlite3.connect("evaluation_data.db", check_same_thread=False)
 cursor = conn.cursor()
 
-# Tabelle erstellen, falls sie noch nicht existiert
+# Tabelle lokal erstellen
 cursor.execute("""
 CREATE TABLE IF NOT EXISTS evaluations (
     id TEXT,
@@ -38,6 +39,16 @@ CREATE TABLE IF NOT EXISTS evaluations (
 )
 """)
 conn.commit()
+
+
+
+
+
+
+
+
+
+
 
 # Titel
 st.title("UXARcis Evaluationstool")
