@@ -7,16 +7,13 @@ import sqlalchemy
 from sqlalchemy import text, create_engine
 import urllib.parse
 
-st.set_page_config(page_title="UXARcis Tool", layout="wide")
-st.title("UXARcis-Evaluationstool")
-st.markdown("Effektive UX-Analyse für AR-Autoren.")
-
-
 
 st.set_page_config(page_title="UXARcis Tool", layout="wide")
 st.title("UXARcis-Datenbanktest")
 st.markdown("Diese App testet die Verbindung zum Neon-Datenbanksystem.")
 
+
+'''
 # Verbindung zu Neon (robust, mit eigenem Engine)
 try:
     username = st.secrets["connections"]["neon"]["username"]
@@ -36,7 +33,7 @@ except Exception as e:
     st.error("❌ Verbindung zur Neon-Datenbank fehlgeschlagen.")
     st.exception(e)
     st.stop()
-
+'''
 
 
 
