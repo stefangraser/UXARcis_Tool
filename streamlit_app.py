@@ -8,6 +8,7 @@ st.set_page_config(page_title="UXARcis Tool", layout="wide")
 st.title("UXARcis-Evaluationstool")
 st.markdown("Effektive UX-Analyse für AR-Autoren.")
 
+
 # Verbindungstest beim Start
 try:
     conn_test = st.connection("postgresql", type="sql")
