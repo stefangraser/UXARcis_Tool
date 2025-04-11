@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS evaluations (
 conn.commit()
 
 # Titel
-st.title("UXARcis Evaluationstool")
+st.title("UXARcis-Evaluationstool")
 st.markdown("""
 Effektive UX-Analyse für AR-Autoren.
 """)
