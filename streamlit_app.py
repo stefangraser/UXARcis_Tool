@@ -4,30 +4,30 @@ import matplotlib.pyplot as plt
 from datetime import datetime
 from sqlalchemy import text
 
-
-# PostgreSQL-Verbindung (über secrets.toml)
-conn = st.connection("postgresql", type="sql")
-engine = conn._instance.engine
-cursor = engine.connect()
-
-# Tabelle für strukturierte Analyse vorbereiten
-cursor.execute(text("""
-CREATE TABLE IF NOT EXISTS evaluations (
-    id TEXT,
-    filename TEXT,
-    upload_date TEXT,
-    item TEXT,
-    participant_id TEXT,
-    value REAL
-)
-"""))
-
-
+st.set_page_config(page_title="UXARcis Tool", layout="wide")
 st.title("UXARcis-Evaluationstool")
 st.markdown("Effektive UX-Analyse für AR-Autoren.")
 
 uploaded_file = st.file_uploader("Lade deine UXARcis-Daten hoch (CSV oder Excel)", type=["csv", "xlsx"])
+
 if uploaded_file:
+    # Verbindungsaufbau erst nach Datei-Upload
+    conn = st.connection("postgresql", type="sql")
+    engine = conn._instance.engine
+    cursor = engine.connect()
+
+    # Tabelle für strukturierte Analyse vorbereiten
+    cursor.execute(text("""
+    CREATE TABLE IF NOT EXISTS evaluations (
+        id TEXT,
+        filename TEXT,
+        upload_date TEXT,
+        item TEXT,
+        participant_id TEXT,
+        value REAL
+    )
+    """))
+
     try:
         # Datei einlesen
         if uploaded_file.name.endswith(".csv"):
