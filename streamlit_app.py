@@ -2,14 +2,13 @@ import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 import sqlite3
-import json
 from datetime import datetime
 
 # Verbindung zur SQLite-Datenbank herstellen (bzw. erstellen, falls nicht vorhanden)
 conn = sqlite3.connect("evaluation_data.db", check_same_thread=False)
 cursor = conn.cursor()
 
-# Tabelle für Einzelwerte (besteht bereits)
+# Tabelle erstellen, falls sie noch nicht existiert
 cursor.execute("""
 CREATE TABLE IF NOT EXISTS evaluations (
     id TEXT,
@@ -20,21 +19,10 @@ CREATE TABLE IF NOT EXISTS evaluations (
     value REAL
 )
 """)
-
-# Neue Tabelle für 1:1 Upload-Daten
-cursor.execute("""
-CREATE TABLE IF NOT EXISTS raw_uploads (
-    id TEXT,
-    filename TEXT,
-    upload_date TEXT,
-    row_index INTEGER,
-    row_data TEXT
-)
-""")
 conn.commit()
 
 # Titel
-st.title("UXARcis Evaluationstool")
+st.title("UXARcis-Evaluationstool")
 st.markdown("""
 Effektive UX-Analyse für AR-Autoren.
 """)
@@ -45,9 +33,7 @@ if uploaded_file:
     try:
         # Automatisches Einlesen je nach Dateityp
         if uploaded_file.name.endswith(".csv"):
-            df_preview = pd.read_csv(uploaded_file, sep=';', header=None, nrows=5)
-            has_header = df_preview.iloc[0].str.contains("G|E1|Spa1|Con1", regex=True).any()
-            df = pd.read_csv(uploaded_file, sep=';', header=0 if has_header else None)
+            df = pd.read_csv(uploaded_file, sep=';')
         else:
             xls = pd.ExcelFile(uploaded_file)
             df_raw = xls.parse(xls.sheet_names[0])
@@ -72,15 +58,6 @@ if uploaded_file:
         upload_id = f"{upload_index}_{date_prefix}"
         file_name = uploaded_file.name
 
-        # SPEICHERN 1:1 - Ganze Zeile (JSON)
-        for i, row in df.iterrows():
-            row_json = json.dumps(row.dropna().to_dict())
-            cursor.execute(
-                "INSERT INTO raw_uploads (id, filename, upload_date, row_index, row_data) VALUES (?, ?, ?, ?, ?)",
-                (upload_id, file_name, upload_date, i, row_json)
-            )
-
-        # SPEICHERN als Einzelwerte für Auswertung
         for i, row in df.iterrows():
             participant_id = f"Teilnehmer_{i+1}"
             for item, value in row.items():
