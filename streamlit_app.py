@@ -63,8 +63,8 @@ if uploaded_file:
         # Jede Zeile = Teilnehmer, jede Spalte = Item
         df = df.reset_index(drop=True)
 
-        for i, row in df.iterrows():
-            participant_id = f"Teilnehmer_{i+1}"
+        for idx, row in df.iterrows():
+            participant_id = f"Teilnehmer_{idx + 1}"
             for item, val in row.items():
                 if pd.notna(val):
                     try:
@@ -92,36 +92,35 @@ if uploaded_file:
             "Kontextualität": ['Con4', 'Con2', 'Con1', 'Con6', 'Con5', 'Con3']
         }
 
-        # Transponieren für Auswertung
+        # Auswertung auf Originalstruktur (Zeilen = Teilnehmer, Spalten = Items)
         df_transposed = df.transpose()
-        df_transposed.columns = [f"Teilnehmer_{i+1}" for i in range(df_transposed.shape[1])]
 
         # Mittelwerte berechnen
         dimension_means = {}
         for name, items in dimensions_items.items():
-            available_items = [item for item in items if item in df_transposed.index]
+            available_items = [item for item in items if item in df.columns]
             if not available_items:
                 st.warning(f"Keine gültigen Spalten für {name} gefunden.")
                 continue
-            selected = df_transposed.loc[available_items].astype(float)
+            selected = df[available_items].astype(float)
             mean_value = selected.stack().mean()
             dimension_means[name] = round(mean_value, 2)
 
         arcis_means = {}
         for name, items in arcis_items.items():
-            available_items = [item for item in items if item in df_transposed.index]
+            available_items = [item for item in items if item in df.columns]
             if not available_items:
                 st.warning(f"Keine gültigen Spalten für {name} gefunden.")
                 continue
-            selected = df_transposed.loc[available_items].astype(float)
+            selected = df[available_items].astype(float)
             mean_value = selected.stack().mean()
             arcis_means[name] = round(mean_value, 2)
 
-        all_ux_items = [item for sublist in dimensions_items.values() for item in sublist if item in df_transposed.index]
-        all_arcis_items = [item for sublist in arcis_items.values() for item in sublist if item in df_transposed.index]
+        all_ux_items = [item for sublist in dimensions_items.values() for item in sublist if item in df.columns]
+        all_arcis_items = [item for sublist in arcis_items.values() for item in sublist if item in df.columns]
 
-        gesamt_ux = df_transposed.loc[all_ux_items].astype(float).stack().mean() if all_ux_items else float('nan')
-        gesamt_arcis = df_transposed.loc[all_arcis_items].astype(float).stack().mean() if all_arcis_items else float('nan')
+        gesamt_ux = df[all_ux_items].astype(float).stack().mean() if all_ux_items else float('nan')
+        gesamt_arcis = df[all_arcis_items].astype(float).stack().mean() if all_arcis_items else float('nan')
 
         # Anzeige UX-Dimensionen
         st.subheader("Mittelwerte je UX-Dimension")
