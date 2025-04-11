@@ -4,11 +4,11 @@ import matplotlib.pyplot as plt
 import sqlite3
 from datetime import datetime
 
-# Verbindung zur SQLite-Datenbank herstellen (bzw. erstellen, falls nicht vorhanden)
+# Verbindung zur SQLite-Datenbank herstellen
 conn = sqlite3.connect("evaluation_data.db", check_same_thread=False)
 cursor = conn.cursor()
 
-# Tabelle erstellen, falls sie noch nicht existiert
+# Analyse-Tabelle vorbereiten (strukturierter Upload wie zuvor)
 cursor.execute("""
 CREATE TABLE IF NOT EXISTS evaluations (
     id TEXT,
@@ -21,17 +21,12 @@ CREATE TABLE IF NOT EXISTS evaluations (
 """)
 conn.commit()
 
-# Titel
 st.title("UXARcis-Evaluationstool")
-st.markdown("""
-Effektive UX-Analyse für AR-Autoren.
-""")
+st.markdown("Effektive UX-Analyse für AR-Autoren.")
 
-# Datei-Upload
 uploaded_file = st.file_uploader("Lade deine UXARcis-Daten hoch (CSV oder Excel)", type=["csv", "xlsx"])
 if uploaded_file:
     try:
-        # Automatisches Einlesen je nach Dateityp
         if uploaded_file.name.endswith(".csv"):
             df = pd.read_csv(uploaded_file, sep=';')
         else:
@@ -42,23 +37,37 @@ if uploaded_file:
             df.columns = df.iloc[0]
             df = df[1:]
 
-        st.success("Datei erfolgreich geladen!")
-
         df.columns = df.columns.astype(str).str.strip()
-        df = df.apply(pd.to_numeric, errors='coerce')
         df = df.reset_index(drop=True)
 
         now = datetime.now()
         upload_date = now.strftime("%Y-%m-%dT%H:%M:%S")
-        date_prefix = now.strftime("%Y%m%d")
+        date_prefix = now.strftime("%Y%m%d_%H%M%S")
+        table_name = f"raw_{date_prefix}"
+        file_name = uploaded_file.name
 
+        # ----------- 1. ROHDATEN 1:1 SPEICHERN ------------
+        create_query = f"CREATE TABLE IF NOT EXISTS [{table_name}] ({', '.join([f'[{col}] TEXT' for col in df.columns])})"
+        cursor.execute(create_query)
+
+        for _, row in df.iterrows():
+            placeholders = ', '.join(['?'] * len(row))
+            insert_query = f"INSERT INTO [{table_name}] VALUES ({placeholders})"
+            cursor.execute(insert_query, list(row))
+
+        conn.commit()
+        st.success(f"Rohdaten in Tabelle `{table_name}` gespeichert.")
+
+        # ----------- 2. DATEN ANALYTISCH SPEICHERN + AUSWERTUNG ------------
+
+        df_numeric = df.copy()
+        df_numeric = df_numeric.apply(pd.to_numeric, errors='coerce')
         cursor.execute("SELECT COUNT(DISTINCT id) FROM evaluations")
         result = cursor.fetchone()
         upload_index = (result[0] or 0) + 1
         upload_id = f"{upload_index}_{date_prefix}"
-        file_name = uploaded_file.name
 
-        for i, row in df.iterrows():
+        for i, row in df_numeric.iterrows():
             participant_id = f"Teilnehmer_{i+1}"
             for item, value in row.items():
                 if pd.notna(value):
@@ -71,6 +80,7 @@ if uploaded_file:
                         continue
         conn.commit()
 
+        # ----------- 3. AUSWERTUNG ------------
         dimensions_items = {
             "Gesamtzufriedenheit": ['G'],
             "Effizienz": ['E5', 'E1', 'E3'],
@@ -86,39 +96,37 @@ if uploaded_file:
             "Kontextualität": ['Con4', 'Con2', 'Con1', 'Con6', 'Con5', 'Con3']
         }
 
-        # Mittelwerte berechnen
         dimension_means = {}
         for name, items in dimensions_items.items():
-            available_items = [item for item in items if item in df.columns]
+            available_items = [item for item in items if item in df_numeric.columns]
             if not available_items:
                 st.warning(f"Keine gültigen Spalten für {name} gefunden.")
                 continue
-            selected = df[available_items].astype(float)
-            mean_value = selected.stack().mean()
+            mean_value = df_numeric[available_items].stack().mean()
             dimension_means[name] = round(mean_value, 2)
 
         arcis_means = {}
         for name, items in arcis_items.items():
-            available_items = [item for item in items if item in df.columns]
+            available_items = [item for item in items if item in df_numeric.columns]
             if not available_items:
                 st.warning(f"Keine gültigen Spalten für {name} gefunden.")
                 continue
-            selected = df[available_items].astype(float)
-            mean_value = selected.stack().mean()
+            mean_value = df_numeric[available_items].stack().mean()
             arcis_means[name] = round(mean_value, 2)
 
-        all_ux_items = [item for sublist in dimensions_items.values() for item in sublist if item in df.columns]
-        all_arcis_items = [item for sublist in arcis_items.values() for item in sublist if item in df.columns]
+        all_ux_items = [item for sublist in dimensions_items.values() for item in sublist if item in df_numeric.columns]
+        all_arcis_items = [item for sublist in arcis_items.values() for item in sublist if item in df_numeric.columns]
 
-        gesamt_ux = df[all_ux_items].astype(float).stack().mean() if all_ux_items else float('nan')
-        gesamt_arcis = df[all_arcis_items].astype(float).stack().mean() if all_arcis_items else float('nan')
+        gesamt_ux = df_numeric[all_ux_items].stack().mean() if all_ux_items else float('nan')
+        gesamt_arcis = df_numeric[all_arcis_items].stack().mean() if all_arcis_items else float('nan')
 
+        # ---------- Darstellung ----------
         st.subheader("Mittelwerte je UX-Dimension")
         ux_df = pd.DataFrame.from_dict(dimension_means, orient='index', columns=['Mittelwert'])
         st.table(ux_df)
 
         fig1, ax1 = plt.subplots()
-        ux_df.plot(kind='barh', legend=False, ax=ax1, color='skyblue')
+        ux_df.plot(kind='barh', legend=False, ax=ax1)
         ax1.set_xlabel("Mittelwert")
         ax1.set_title("UX-Dimensionen")
         st.pyplot(fig1)
@@ -128,7 +136,7 @@ if uploaded_file:
         st.table(arcis_df)
 
         fig2, ax2 = plt.subplots()
-        arcis_df.plot(kind='barh', legend=False, ax=ax2, color='lightgreen')
+        arcis_df.plot(kind='barh', legend=False, ax=ax2)
         ax2.set_xlabel("Mittelwert")
         ax2.set_title("ARcis-Kriterien")
         st.pyplot(fig2)
@@ -137,9 +145,13 @@ if uploaded_file:
         st.markdown(f"**Gesamt UX Score:** {gesamt_ux:.2f}")
         st.markdown(f"**ARcis Score:** {gesamt_arcis:.2f}")
 
-        st.subheader("Alle gespeicherten Einzelwerte")
+        st.subheader("Alle gespeicherten Einzelwerte (strukturierte Tabelle)")
         df_saved = pd.read_sql_query("SELECT * FROM evaluations ORDER BY upload_date DESC", conn)
         st.dataframe(df_saved)
+
+        st.subheader(f"Rohdaten aus Tabelle `{table_name}`")
+        df_raw_loaded = pd.read_sql_query(f"SELECT * FROM [{table_name}]", conn)
+        st.dataframe(df_raw_loaded)
 
     except Exception as e:
         st.error(f"Fehler beim Verarbeiten der Datei: {e}")
