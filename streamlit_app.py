@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 # Titel
 st.title("UXARcis Evaluationstool")
 st.markdown("""
-Dieses Tool berechnet die Mittelwerte der UXARcis-Daten auf Basis gleich benannter Spaltenüberschriften.
+Effektive UX-Analyse für AR-Autoren.
 """)
 
 
