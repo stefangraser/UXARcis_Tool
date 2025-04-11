@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS evaluations (
     filename TEXT,
     upload_date TEXT,
     item TEXT,
-    participant TEXT,
+    participant_id TEXT,
     value REAL
 )
 """)
@@ -60,17 +60,17 @@ if uploaded_file:
 
         file_name = uploaded_file.name
 
-        # Transponieren: jede Spalte = 1 Teilnehmer
-        df_transposed = df.transpose()
-        df_transposed.columns = [f"Teilnehmer_{i+1}" for i in range(df_transposed.shape[1])]
+        # Jede Zeile = Teilnehmer, jede Spalte = Item
+        df = df.reset_index(drop=True)
 
-        for item, values in df_transposed.iterrows():
-            for participant, val in values.items():
+        for i, row in df.iterrows():
+            participant_id = f"Teilnehmer_{i+1}"
+            for item, val in row.items():
                 if pd.notna(val):
                     try:
                         cursor.execute(
-                            "INSERT INTO evaluations (id, filename, upload_date, item, participant, value) VALUES (?, ?, ?, ?, ?, ?)",
-                            (upload_id, file_name, upload_date, item, participant, float(val))
+                            "INSERT INTO evaluations (id, filename, upload_date, item, participant_id, value) VALUES (?, ?, ?, ?, ?, ?)",
+                            (upload_id, file_name, upload_date, item, participant_id, float(val))
                         )
                     except:
                         continue
@@ -91,6 +91,10 @@ if uploaded_file:
             "Interaktivität": ['Int4', 'Int2', 'Int6', 'Int3', 'Int1', 'Int5'],
             "Kontextualität": ['Con4', 'Con2', 'Con1', 'Con6', 'Con5', 'Con3']
         }
+
+        # Transponieren für Auswertung
+        df_transposed = df.transpose()
+        df_transposed.columns = [f"Teilnehmer_{i+1}" for i in range(df_transposed.shape[1])]
 
         # Mittelwerte berechnen
         dimension_means = {}
@@ -155,4 +159,3 @@ if uploaded_file:
         st.error(f"Fehler beim Verarbeiten der Datei: {e}")
 else:
     st.info("Bitte lade eine CSV- oder Excel-Datei mit UXARcis-Daten hoch.")
-
