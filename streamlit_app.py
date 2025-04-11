@@ -1,15 +1,16 @@
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
-import sqlite3
 from datetime import datetime
+from sqlalchemy import text
 
-# Verbindung zur SQLite-Datenbank herstellen
-conn = sqlite3.connect("evaluation_data.db", check_same_thread=False)
-cursor = conn.cursor()
+# PostgreSQL-Verbindung (über secrets.toml)
+conn = st.connection("postgresql", type="sql")
+engine = conn._instance.engine
+cursor = engine.connect()
 
-# Analyse-Tabelle vorbereiten (strukturierter Upload wie zuvor)
-cursor.execute("""
+# Tabelle für strukturierte Analyse vorbereiten
+cursor.execute(text("""
 CREATE TABLE IF NOT EXISTS evaluations (
     id TEXT,
     filename TEXT,
@@ -18,8 +19,7 @@ CREATE TABLE IF NOT EXISTS evaluations (
     participant_id TEXT,
     value REAL
 )
-""")
-conn.commit()
+"""))
 
 st.title("UXARcis-Evaluationstool")
 st.markdown("Effektive UX-Analyse für AR-Autoren.")
@@ -27,12 +27,12 @@ st.markdown("Effektive UX-Analyse für AR-Autoren.")
 uploaded_file = st.file_uploader("Lade deine UXARcis-Daten hoch (CSV oder Excel)", type=["csv", "xlsx"])
 if uploaded_file:
     try:
+        # Datei einlesen
         if uploaded_file.name.endswith(".csv"):
             df = pd.read_csv(uploaded_file, sep=';')
         else:
             xls = pd.ExcelFile(uploaded_file)
-            df_raw = xls.parse(xls.sheet_names[0])
-            df_raw = df_raw.dropna(how="all")
+            df_raw = xls.parse(xls.sheet_names[0]).dropna(how="all")
             df = df_raw.copy()
             df.columns = df.iloc[0]
             df = df[1:]
@@ -46,24 +46,18 @@ if uploaded_file:
         table_name = f"raw_{date_prefix}"
         file_name = uploaded_file.name
 
-        # ----------- 1. ROHDATEN 1:1 SPEICHERN ------------
-        create_query = f"CREATE TABLE IF NOT EXISTS [{table_name}] ({', '.join([f'[{col}] TEXT' for col in df.columns])})"
-        cursor.execute(create_query)
+        # Rohdaten-Tabelle (originaler Upload)
+        create_raw = f"CREATE TABLE IF NOT EXISTS \"{table_name}\" ({', '.join([f'\"{col}\" TEXT' for col in df.columns])})"
+        cursor.execute(text(create_raw))
 
         for _, row in df.iterrows():
-            placeholders = ', '.join(['?'] * len(row))
-            insert_query = f"INSERT INTO [{table_name}] VALUES ({placeholders})"
-            cursor.execute(insert_query, list(row))
+            placeholders = ', '.join([f':{col}' for col in df.columns])
+            insert_raw = f"INSERT INTO \"{table_name}\" VALUES ({placeholders})"
+            cursor.execute(text(insert_raw), row.to_dict())
 
-        conn.commit()
-        st.success(f"Rohdaten in Tabelle `{table_name}` gespeichert.")
-
-        # ----------- 2. DATEN ANALYTISCH SPEICHERN + AUSWERTUNG ------------
-
-        df_numeric = df.copy()
-        df_numeric = df_numeric.apply(pd.to_numeric, errors='coerce')
-        cursor.execute("SELECT COUNT(DISTINCT id) FROM evaluations")
-        result = cursor.fetchone()
+        # Strukturierte Analyse
+        df_numeric = df.apply(pd.to_numeric, errors='coerce')
+        result = cursor.execute(text("SELECT COUNT(DISTINCT id) FROM evaluations")).fetchone()
         upload_index = (result[0] or 0) + 1
         upload_id = f"{upload_index}_{date_prefix}"
 
@@ -71,16 +65,21 @@ if uploaded_file:
             participant_id = f"Teilnehmer_{i+1}"
             for item, value in row.items():
                 if pd.notna(value):
-                    try:
-                        cursor.execute(
-                            "INSERT INTO evaluations (id, filename, upload_date, item, participant_id, value) VALUES (?, ?, ?, ?, ?, ?)",
-                            (upload_id, file_name, upload_date, item, participant_id, float(value))
-                        )
-                    except:
-                        continue
-        conn.commit()
+                    cursor.execute(text("""
+                        INSERT INTO evaluations (id, filename, upload_date, item, participant_id, value)
+                        VALUES (:id, :filename, :upload_date, :item, :participant_id, :value)
+                    """), {
+                        "id": upload_id,
+                        "filename": file_name,
+                        "upload_date": upload_date,
+                        "item": item,
+                        "participant_id": participant_id,
+                        "value": float(value)
+                    })
 
-        # ----------- 3. AUSWERTUNG ------------
+        st.success(f"Upload erfolgreich. Daten in Tabelle `{table_name}` gespeichert.")
+
+        # UXARcis-Auswertung
         dimensions_items = {
             "Gesamtzufriedenheit": ['G'],
             "Effizienz": ['E5', 'E1', 'E3'],
@@ -120,7 +119,6 @@ if uploaded_file:
         gesamt_ux = df_numeric[all_ux_items].stack().mean() if all_ux_items else float('nan')
         gesamt_arcis = df_numeric[all_arcis_items].stack().mean() if all_arcis_items else float('nan')
 
-        # ---------- Darstellung ----------
         st.subheader("Mittelwerte je UX-Dimension")
         ux_df = pd.DataFrame.from_dict(dimension_means, orient='index', columns=['Mittelwert'])
         st.table(ux_df)
@@ -145,15 +143,17 @@ if uploaded_file:
         st.markdown(f"**Gesamt UX Score:** {gesamt_ux:.2f}")
         st.markdown(f"**ARcis Score:** {gesamt_arcis:.2f}")
 
-        st.subheader("Alle gespeicherten Einzelwerte (strukturierte Tabelle)")
-        df_saved = pd.read_sql_query("SELECT * FROM evaluations ORDER BY upload_date DESC", conn)
-        st.dataframe(df_saved)
+        # Alle gespeicherten Daten anzeigen
+        df_eval = conn.query("SELECT * FROM evaluations ORDER BY upload_date DESC")
+        st.subheader("Alle gespeicherten Einzelwerte")
+        st.dataframe(df_eval)
 
+        df_raw_loaded = conn.query(f'SELECT * FROM "{table_name}"')
         st.subheader(f"Rohdaten aus Tabelle `{table_name}`")
-        df_raw_loaded = pd.read_sql_query(f"SELECT * FROM [{table_name}]", conn)
         st.dataframe(df_raw_loaded)
 
     except Exception as e:
         st.error(f"Fehler beim Verarbeiten der Datei: {e}")
 else:
     st.info("Bitte lade eine CSV- oder Excel-Datei mit UXARcis-Daten hoch.")
+
