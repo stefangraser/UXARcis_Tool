@@ -2,12 +2,12 @@ import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 from datetime import datetime
-from sqlalchemy import text
+from sqlalchemy import text, create_engine
+import urllib.parse
 
 st.set_page_config(page_title="UXARcis Tool", layout="wide")
 st.title("UXARcis-Evaluationstool")
 st.markdown("Effektive UX-Analyse für AR-Autoren.")
-
 
 # Verbindung zu Neon (robust, mit eigenem Engine)
 try:
@@ -20,7 +20,7 @@ try:
     url = f"postgresql+psycopg2://{username}:{urllib.parse.quote_plus(password)}@{host}/{database}?sslmode={sslmode}"
     engine = create_engine(url, pool_pre_ping=True, pool_size=5, max_overflow=0)
 
-    with engine.connect() as test_conn:
+    with engine.begin() as test_conn:
         test_conn.execute(text("SELECT 1"))
     st.success("✅ Verbindung zur Neon-Datenbank erfolgreich.")
 except Exception as e:
@@ -28,28 +28,9 @@ except Exception as e:
     st.exception(e)
     st.stop()
 
-
-
 uploaded_file = st.file_uploader("Lade deine UXARcis-Daten hoch (CSV oder Excel)", type=["csv", "xlsx"])
 
 if uploaded_file:
-    # Verbindungsaufbau nach Datei-Upload
-    conn = st.connection("postgresql", type="sql")
-    engine = conn._instance.engine
-    cursor = engine.connect()
-
-    # Tabelle für strukturierte Analyse vorbereiten
-    cursor.execute(text("""
-    CREATE TABLE IF NOT EXISTS evaluations (
-        id TEXT,
-        filename TEXT,
-        upload_date TEXT,
-        item TEXT,
-        participant_id TEXT,
-        value REAL
-    )
-    """))
-
     try:
         # Datei einlesen
         if uploaded_file.name.endswith(".csv"):
@@ -70,37 +51,51 @@ if uploaded_file:
         table_name = f"raw_{date_prefix}"
         file_name = uploaded_file.name
 
-        # Rohdaten-Tabelle (originaler Upload)
-        columns_sql = ', '.join([f'"{col}" TEXT' for col in df.columns])
-        create_raw = f'CREATE TABLE IF NOT EXISTS "{table_name}" ({columns_sql})'
-        cursor.execute(text(create_raw))
+        # Verbindung für Upload und Analyse in stabiler Session
+        with engine.begin() as cursor:
+            # Tabelle für strukturierte Analyse vorbereiten
+            cursor.execute(text("""
+            CREATE TABLE IF NOT EXISTS evaluations (
+                id TEXT,
+                filename TEXT,
+                upload_date TEXT,
+                item TEXT,
+                participant_id TEXT,
+                value REAL
+            )
+            """))
 
-        for _, row in df.iterrows():
-            placeholders = ', '.join([f':{col}' for col in df.columns])
-            insert_raw = f'INSERT INTO "{table_name}" VALUES ({placeholders})'
-            cursor.execute(text(insert_raw), row.to_dict())
+            # Rohdaten-Tabelle (originaler Upload)
+            columns_sql = ', '.join([f'"{col}" TEXT' for col in df.columns])
+            create_raw = f'CREATE TABLE IF NOT EXISTS "{table_name}" ({columns_sql})'
+            cursor.execute(text(create_raw))
 
-        # Strukturierte Analyse
-        df_numeric = df.apply(pd.to_numeric, errors='coerce')
-        result = cursor.execute(text("SELECT COUNT(DISTINCT id) FROM evaluations")).fetchone()
-        upload_index = (result[0] or 0) + 1
-        upload_id = f"{upload_index}_{date_prefix}"
+            for _, row in df.iterrows():
+                placeholders = ', '.join([f':{col}' for col in df.columns])
+                insert_raw = f'INSERT INTO "{table_name}" VALUES ({placeholders})'
+                cursor.execute(text(insert_raw), row.to_dict())
 
-        for i, row in df_numeric.iterrows():
-            participant_id = f"Teilnehmer_{i+1}"
-            for item, value in row.items():
-                if pd.notna(value):
-                    cursor.execute(text("""
-                        INSERT INTO evaluations (id, filename, upload_date, item, participant_id, value)
-                        VALUES (:id, :filename, :upload_date, :item, :participant_id, :value)
-                    """), {
-                        "id": upload_id,
-                        "filename": file_name,
-                        "upload_date": upload_date,
-                        "item": item,
-                        "participant_id": participant_id,
-                        "value": float(value)
-                    })
+            # Strukturierte Analyse
+            df_numeric = df.apply(pd.to_numeric, errors='coerce')
+            result = cursor.execute(text("SELECT COUNT(DISTINCT id) FROM evaluations")).fetchone()
+            upload_index = (result[0] or 0) + 1
+            upload_id = f"{upload_index}_{date_prefix}"
+
+            for i, row in df_numeric.iterrows():
+                participant_id = f"Teilnehmer_{i+1}"
+                for item, value in row.items():
+                    if pd.notna(value):
+                        cursor.execute(text("""
+                            INSERT INTO evaluations (id, filename, upload_date, item, participant_id, value)
+                            VALUES (:id, :filename, :upload_date, :item, :participant_id, :value)
+                        """), {
+                            "id": upload_id,
+                            "filename": file_name,
+                            "upload_date": upload_date,
+                            "item": item,
+                            "participant_id": participant_id,
+                            "value": float(value)
+                        })
 
         st.success(f"Upload erfolgreich. Daten in Tabelle `{table_name}` gespeichert.")
 
@@ -168,13 +163,16 @@ if uploaded_file:
         st.markdown(f"**Gesamt UX Score:** {gesamt_ux:.2f}")
         st.markdown(f"**ARcis Score:** {gesamt_arcis:.2f}")
 
-        df_eval = conn.query("SELECT * FROM evaluations ORDER BY upload_date DESC")
-        st.subheader("Alle gespeicherten Einzelwerte")
-        st.dataframe(df_eval)
+        with engine.begin() as conn:
+            df_eval = conn.execute(text("SELECT * FROM evaluations ORDER BY upload_date DESC")).fetchall()
+            df_eval_df = pd.DataFrame(df_eval, columns=[col.name for col in conn.get_execution_options().get('compiled_cache', {}).keys()])
+            st.subheader("Alle gespeicherten Einzelwerte")
+            st.dataframe(df_eval_df)
 
-        df_raw_loaded = conn.query(f'SELECT * FROM "{table_name}"')
-        st.subheader(f"Rohdaten aus Tabelle `{table_name}`")
-        st.dataframe(df_raw_loaded)
+            df_raw_loaded = conn.execute(text(f'SELECT * FROM "{table_name}"')).fetchall()
+            df_raw_df = pd.DataFrame(df_raw_loaded, columns=[col.name for col in conn.get_execution_options().get('compiled_cache', {}).keys()])
+            st.subheader(f"Rohdaten aus Tabelle `{table_name}`")
+            st.dataframe(df_raw_df)
 
     except Exception as e:
         st.error(f"Fehler beim Verarbeiten der Datei: {e}")
