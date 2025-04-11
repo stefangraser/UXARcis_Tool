@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS evaluations (
 conn.commit()
 
 # Titel
-st.title("UXARcis-Evaluationstool")
+st.title("UXARcis Evaluationstool")
 st.markdown("""
 Effektive UX-Analyse für AR-Autoren.
 """)
@@ -47,6 +47,7 @@ if uploaded_file:
         # Bereinige Spaltennamen
         df.columns = df.columns.astype(str).str.strip()
         df = df.apply(pd.to_numeric, errors='coerce')
+        df = df.reset_index(drop=True)
 
         # ID = fortlaufende Nummer + Datum
         now = datetime.now()
@@ -60,23 +61,21 @@ if uploaded_file:
 
         file_name = uploaded_file.name
 
-        # Jede Zeile = Teilnehmer, jede Spalte = Item
-        df = df.reset_index(drop=True)
-
-        for idx, row in df.iterrows():
-            participant_id = f"Teilnehmer_{idx + 1}"
-            for item, val in row.items():
-                if pd.notna(val):
+        # SQLite-Einträge: Zeilen = Teilnehmer, Spalten = Items
+        for i, row in df.iterrows():
+            participant_id = f"Teilnehmer_{i+1}"
+            for item, value in row.items():
+                if pd.notna(value):
                     try:
                         cursor.execute(
                             "INSERT INTO evaluations (id, filename, upload_date, item, participant_id, value) VALUES (?, ?, ?, ?, ?, ?)",
-                            (upload_id, file_name, upload_date, item, participant_id, float(val))
+                            (upload_id, file_name, upload_date, item, participant_id, float(value))
                         )
                     except:
                         continue
         conn.commit()
 
-        # Definiere Item-Zuweisungen
+        # Item-Gruppen für Auswertung definieren
         dimensions_items = {
             "Gesamtzufriedenheit": ['G'],
             "Effizienz": ['E5', 'E1', 'E3'],
@@ -91,9 +90,6 @@ if uploaded_file:
             "Interaktivität": ['Int4', 'Int2', 'Int6', 'Int3', 'Int1', 'Int5'],
             "Kontextualität": ['Con4', 'Con2', 'Con1', 'Con6', 'Con5', 'Con3']
         }
-
-        # Auswertung auf Originalstruktur (Zeilen = Teilnehmer, Spalten = Items)
-        df_transposed = df.transpose()
 
         # Mittelwerte berechnen
         dimension_means = {}
