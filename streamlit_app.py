@@ -8,16 +8,20 @@ st.set_page_config(page_title="UXARcis Tool", layout="wide")
 st.title("UXARcis-Evaluationstool")
 st.markdown("Effektive UX-Analyse für AR-Autoren.")
 
-# Verbindungstest beim Start
+
+# Verbindung zu Neon (über secrets oder environment)
 try:
-    conn_test = st.connection("postgresql", type="sql")
-    test_engine = conn_test._instance.engine
-    with test_engine.connect() as test_conn:
+    conn = st.connection("neon", type="sql")
+    engine = conn._instance.engine
+    with engine.connect() as test_conn:
         test_conn.execute(text("SELECT 1"))
-    st.success("✅ Verbindung zur Datenbank erfolgreich.")
+    st.success("✅ Verbindung zur Neon-Datenbank erfolgreich.")
 except Exception as e:
-    st.error("❌ Verbindung zur Datenbank fehlgeschlagen.")
+    st.error("❌ Verbindung zur Neon-Datenbank fehlgeschlagen.")
     st.exception(e)
+    st.stop()
+    st.exception(e)
+
 
 uploaded_file = st.file_uploader("Lade deine UXARcis-Daten hoch (CSV oder Excel)", type=["csv", "xlsx"])
 
