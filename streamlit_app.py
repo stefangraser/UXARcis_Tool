@@ -47,12 +47,13 @@ if uploaded_file:
         file_name = uploaded_file.name
 
         # Rohdaten-Tabelle (originaler Upload)
-        create_raw = f"CREATE TABLE IF NOT EXISTS \"{table_name}\" ({', '.join([f'\"{col}\" TEXT' for col in df.columns])})"
+        columns_sql = ', '.join([f'"{col}" TEXT' for col in df.columns])
+        create_raw = f'CREATE TABLE IF NOT EXISTS "{table_name}" ({columns_sql})'
         cursor.execute(text(create_raw))
 
         for _, row in df.iterrows():
             placeholders = ', '.join([f':{col}' for col in df.columns])
-            insert_raw = f"INSERT INTO \"{table_name}\" VALUES ({placeholders})"
+            insert_raw = f'INSERT INTO "{table_name}" VALUES ({placeholders})'
             cursor.execute(text(insert_raw), row.to_dict())
 
         # Strukturierte Analyse
@@ -143,7 +144,6 @@ if uploaded_file:
         st.markdown(f"**Gesamt UX Score:** {gesamt_ux:.2f}")
         st.markdown(f"**ARcis Score:** {gesamt_arcis:.2f}")
 
-        # Alle gespeicherten Daten anzeigen
         df_eval = conn.query("SELECT * FROM evaluations ORDER BY upload_date DESC")
         st.subheader("Alle gespeicherten Einzelwerte")
         st.dataframe(df_eval)
