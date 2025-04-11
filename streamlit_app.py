@@ -3,7 +3,6 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from datetime import datetime
 import psycopg2
-import sqlalchemy
 from sqlalchemy import text, create_engine
 import urllib.parse
 
