@@ -9,10 +9,18 @@ st.title("UXARcis-Evaluationstool")
 st.markdown("Effektive UX-Analyse für AR-Autoren.")
 
 
-# Verbindung zu Neon (über secrets oder environment)
+
+# Verbindung zu Neon (robust, mit eigenem Engine)
 try:
-    conn = st.connection("neon", type="sql")
-    engine = conn._instance.engine
+    username = st.secrets["connections"]["neon"]["username"]
+    password = st.secrets["connections"]["neon"]["password"]
+    host = st.secrets["connections"]["neon"]["host"]
+    database = st.secrets["connections"]["neon"]["database"]
+    sslmode = st.secrets["connections"]["neon"].get("sslmode", "require")
+
+    url = f"postgresql+psycopg2://{username}:{urllib.parse.quote_plus(password)}@{host}/{database}?sslmode={sslmode}"
+    engine = create_engine(url, pool_pre_ping=True, pool_size=5, max_overflow=0)
+
     with engine.connect() as test_conn:
         test_conn.execute(text("SELECT 1"))
     st.success("✅ Verbindung zur Neon-Datenbank erfolgreich.")
@@ -20,7 +28,7 @@ except Exception as e:
     st.error("❌ Verbindung zur Neon-Datenbank fehlgeschlagen.")
     st.exception(e)
     st.stop()
-    st.exception(e)
+
 
 
 uploaded_file = st.file_uploader("Lade deine UXARcis-Daten hoch (CSV oder Excel)", type=["csv", "xlsx"])
