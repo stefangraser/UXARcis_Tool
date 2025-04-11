@@ -9,6 +9,7 @@ st.set_page_config(page_title="UXARcis Tool", layout="wide")
 st.title("UXARcis-Evaluationstool")
 st.markdown("Effektive UX-Analyse für AR-Autoren.")
 
+
 # Verbindung zu Neon (robust, mit eigenem Engine)
 try:
     username = st.secrets["connections"]["neon"]["username"]
