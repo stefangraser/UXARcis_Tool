@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 from datetime import datetime
 from sqlalchemy import text
 
+
 # PostgreSQL-Verbindung (über secrets.toml)
 conn = st.connection("postgresql", type="sql")
 engine = conn._instance.engine
