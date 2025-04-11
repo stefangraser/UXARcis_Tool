@@ -9,7 +9,6 @@ st.title("UXARcis-Evaluationstool")
 st.markdown("Effektive UX-Analyse für AR-Autoren.")
 
 
-
 # Verbindung zu Neon (robust, mit eigenem Engine)
 try:
     username = st.secrets["connections"]["neon"]["username"]
